@@ -25,6 +25,8 @@ namespace Common_glTF_Exporter.Core
 
         public Autodesk.Revit.DB.Transform linkOriginalTranformation { get; private set; }
 
+        private readonly bool isDebug;
+
         public bool isLink { get; private set; }
 
         private Preferences preferences;
@@ -74,10 +76,11 @@ namespace Common_glTF_Exporter.Core
             }
         }
 
-        public GLTFExportContext(Document doc)
+        public GLTFExportContext(Document doc, bool isDebug = false)
         {
             currentDocument = doc;
             currentView = doc.ActiveView;
+            this.isDebug = isDebug;
         }
 
         /// <summary>
@@ -132,7 +135,7 @@ namespace Common_glTF_Exporter.Core
             {
                 FileExport.Run(preferences, bufferViews, buffers, binaryFileData,
                     scenes, nodes, meshes, materials, accessors, textures, images);
-                Compression.Run(preferences, ProgressBarWindow.ViewModel);
+                Compression.Run(preferences, ProgressBarWindow.ViewModel, isDebug);
             }
         }
 
@@ -154,7 +157,7 @@ namespace Common_glTF_Exporter.Core
 
             linkTransformation = (currentElement as RevitLinkInstance)?.GetTransform();
 
-            if (!isLink)
+            if (!isLink && !isDebug)
             {
                 if (!currentElement.IsHidden(currentView) &&
                     currentView.IsElementVisibleInTemporaryViewMode(TemporaryViewMode.TemporaryHideIsolate, 
