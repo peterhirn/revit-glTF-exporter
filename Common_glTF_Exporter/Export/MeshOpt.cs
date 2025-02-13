@@ -41,6 +41,9 @@ namespace Common_glTF_Exporter.Export
             MethodInfo defaultSettings = mixedModeAssembly.GetType("Gltf.GltfSettings").GetMethod("defaults");
 
             var settings = defaultSettings.Invoke(null, null);
+            var keepNodes = settings.GetType().GetProperty("keep_nodes", BindingFlags.Public | BindingFlags.Instance);
+            keepNodes.SetValue(settings, true, null);
+
             MethodInfo gltfpack = mixedModeAssembly.GetType("Gltf.GltfPack").GetMethod("gltfpack");
             object[] parameters = new object[4];
             parameters[0] = fileToCompress;
