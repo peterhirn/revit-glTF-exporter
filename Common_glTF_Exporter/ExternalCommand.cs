@@ -83,7 +83,7 @@
                 SettingsConfig.SetValue("lights", "false");
                 SettingsConfig.SetValue("grids", "false");
                 SettingsConfig.SetValue("batchId", "false");
-                SettingsConfig.SetValue("properties", "true");
+                SettingsConfig.SetValue("properties", "false");
                 SettingsConfig.SetValue("relocateTo0", "true");
                 SettingsConfig.SetValue("flipAxis", "true");
                 SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
