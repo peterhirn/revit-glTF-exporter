@@ -45,6 +45,9 @@ namespace Common_glTF_Exporter.Export
             var keepNodes = settings.GetType().GetProperty("keep_nodes", BindingFlags.Public | BindingFlags.Instance);
             keepNodes.SetValue(settings, true, null);
 
+            var keepExtras = settings.GetType().GetProperty("keep_extras", BindingFlags.Public | BindingFlags.Instance);
+            keepExtras.SetValue(settings, true, null);
+
             var compress = settings.GetType().GetProperty("compress", BindingFlags.Public | BindingFlags.Instance);
             compress.SetValue(settings, true, null);
 

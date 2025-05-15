@@ -11,6 +11,7 @@
 		<Platforms>AnyCPU;x64;x86</Platforms>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+		<LangVersion>13.0</LangVersion>
 	</PropertyGroup>
 	<PropertyGroup>
   		<AssemblyTitle>Revit_glTF_Exporter_2025</AssemblyTitle>

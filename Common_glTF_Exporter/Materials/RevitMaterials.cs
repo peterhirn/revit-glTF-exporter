@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Autodesk.Revit.DB;
@@ -11,10 +12,30 @@ using System.IO.Ports;
 using System.Windows.Controls;
 using System.Windows.Media.Media3D;
 using Material = Autodesk.Revit.DB.Material;
-
+using Newtonsoft.Json;
 
 namespace Common_glTF_Exporter.Export
 {
+    public record MaterialConfig(
+        string Name,
+        [JsonProperty("base_color")]
+        List<double> Color,
+        double Alpha,
+        double Metallic,
+        double Roughness)
+    {
+        const string DefaultPath = "C:\\Users\\user\\Documents\\CoreMaterials.json";
+
+        public static Dictionary<string, MaterialConfig> ReadFile(string? path = null)
+        {
+            var _path = path ?? DefaultPath;
+            if (!File.Exists(_path)) throw new InvalidOperationException($"Missing config {_path}");
+            var materials = JsonConvert.DeserializeObject<List<MaterialConfig>>(File.ReadAllText(_path));
+            if (materials is null) throw new InvalidOperationException("Failed to deserialize material config");
+            return materials.ToDictionary(m => m.Name);
+        }
+    }
+
     public static class RevitMaterials
     {
         const int ONEINTVALUE = 1;
@@ -23,6 +44,8 @@ namespace Common_glTF_Exporter.Export
         /// Container for material names (Local cache to avoid Revit API I/O)
         /// </summary>
         static Dictionary<ElementId, MaterialCacheDTO> MaterialNameContainer = new Dictionary<ElementId, MaterialCacheDTO>();
+
+        static readonly Lazy<Dictionary<string, MaterialConfig>> MatConfig = new(() => MaterialConfig.ReadFile());
 
         /// <summary>
         /// Export Revit materials.
@@ -56,15 +79,17 @@ namespace Common_glTF_Exporter.Export
                 material = doc.GetElement(node.MaterialId) as Material;
             }
 
+            MatConfig.Value.TryGetValue(gl_mat.name, out var config);
+
             GLTFPBR pbr = new GLTFPBR();
-            MaterialProperties.SetProperties(node, opacity, ref pbr, ref gl_mat);
+            MaterialProperties.SetProperties(node, opacity, ref pbr, ref gl_mat, config);
 
             if (material != null && preferences.materials == MaterialsEnum.textures)
             {
                 MaterialTextures.SetMaterialTextures(material, gl_mat, doc, opacity);
             }
 
-            MaterialProperties.SetMaterialColour(node, opacity, ref pbr, ref gl_mat);
+            MaterialProperties.SetMaterialColour(node, opacity, ref pbr, ref gl_mat, config);
 
             return gl_mat;
         }

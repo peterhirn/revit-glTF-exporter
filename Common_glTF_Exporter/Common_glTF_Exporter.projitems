@@ -70,6 +70,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Utils\GLTFBinaryDataUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\SettingsConfig.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\Theme.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Utils\RecordCompat.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Version\DownloadFile.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Version\InternetConnection.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Version\LatestVersion.cs" />
