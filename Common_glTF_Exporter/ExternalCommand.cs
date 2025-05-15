@@ -78,15 +78,18 @@
 
                 SettingsConfig.SetValue("materials", "true");
                 SettingsConfig.SetValue("format", "glb");
+                //SettingsConfig.SetValue("format", "gltf");
                 SettingsConfig.SetValue("normals", "true");
                 SettingsConfig.SetValue("levels", "false");
                 SettingsConfig.SetValue("lights", "false");
                 SettingsConfig.SetValue("grids", "false");
                 SettingsConfig.SetValue("batchId", "false");
-                SettingsConfig.SetValue("properties", "false");
+                //SettingsConfig.SetValue("properties", "false");
+                SettingsConfig.SetValue("properties", "true");
                 SettingsConfig.SetValue("relocateTo0", "true");
                 SettingsConfig.SetValue("flipAxis", "true");
                 SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
+                //SettingsConfig.SetValue("compression", "none");
                 SettingsConfig.SetValue("compression", "Meshopt");
                 SettingsConfig.SetValue("path", Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\out");
                 SettingsConfig.SetValue("fileName", "out");

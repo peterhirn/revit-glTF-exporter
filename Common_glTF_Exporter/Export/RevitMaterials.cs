@@ -1,9 +1,33 @@
 ﻿namespace Common_glTF_Exporter.Export
 {
+    using System;
+    using System.IO;
+    using System.Linq;
     using System.Collections.Generic;
     using Autodesk.Revit.DB;
     using Common_glTF_Exporter.Core;
     using Revit_glTF_Exporter;
+    using Newtonsoft.Json;
+
+    internal record MaterialConfig(
+        string Name,
+        [JsonProperty("base_color")]
+        List<double> Color,
+        double Alpha,
+        double Metallic,
+        double Roughness)
+    {
+        const string DefaultPath = "C:\\Users\\user\\Documents\\CoreMaterials.json";
+
+        public static Dictionary<string, MaterialConfig> ReadFile(string? path = null)
+        {
+            var _path = path ?? DefaultPath;
+            if (!File.Exists(_path)) throw new InvalidOperationException($"Missing config {_path}");
+            var materials = JsonConvert.DeserializeObject<List<MaterialConfig>>(File.ReadAllText(_path));
+            if (materials is null) throw new InvalidOperationException("Failed to deserialize material config");
+            return materials.ToDictionary(m => m.Name);
+        }
+    }
 
     public static class RevitMaterials
     {
@@ -15,6 +39,8 @@
         /// Container for material names (Local cache to avoid Revit API I/O)
         /// </summary>
         static Dictionary<ElementId, MaterialCacheDTO> MaterialNameContainer = new Dictionary<ElementId, MaterialCacheDTO>();
+
+        static readonly Lazy<Dictionary<string, MaterialConfig>> MatConfig = new(() => MaterialConfig.ReadFile());
 
         /// <summary>
         /// Export Revit materials.
@@ -48,23 +74,39 @@
                     uniqueId = elementData.UniqueId;
                 }
 
+                MatConfig.Value.TryGetValue(gl_mat.name, out var config);
+
                 GLTFPBR pbr = new GLTFPBR();
-                SetMaterialsProperties(node, opacity, ref pbr, ref gl_mat);
+                SetMaterialsProperties(node, opacity, ref pbr, ref gl_mat, config);
 
                 materials.AddOrUpdateCurrentMaterial(uniqueId, gl_mat, false);
             }
         }
 
-        private static void SetMaterialsProperties(MaterialNode node, float opacity, ref GLTFPBR pbr, ref GLTFMaterial gl_mat)
-        {
-            pbr.baseColorFactor = new List<float>(4) { node.Color.Red / 255f, node.Color.Green / 255f, node.Color.Blue / 255f, opacity };
-            pbr.metallicFactor = 0f;
-            pbr.roughnessFactor = opacity != 1 ? 0.5f : 1f;
-            gl_mat.pbrMetallicRoughness = pbr;
+        public static bool AlmostEqual(double lhs, double rhs, double delta = double.Epsilon) =>
+            Math.Abs(lhs - rhs) < delta;
 
-            // TODO: Implement MASK alphamode for elements like leaves or wire fences
-            gl_mat.alphaMode = opacity != 1 ? BLEND : OPAQUE;
-            gl_mat.alphaCutoff = null;
+        private static void SetMaterialsProperties(MaterialNode node, float opacity, ref GLTFPBR pbr, ref GLTFMaterial gl_mat, MaterialConfig? config)
+        {
+            if (config is null)
+            {
+                pbr.baseColorFactor = new List<float>(4) { node.Color.Red / 255f, node.Color.Green / 255f, node.Color.Blue / 255f, opacity };
+                pbr.metallicFactor = 0f;
+                pbr.roughnessFactor = opacity != 1 ? 0.5f : 1f;
+                gl_mat.pbrMetallicRoughness = pbr;
+
+                // TODO: Implement MASK alphamode for elements like leaves or wire fences
+                gl_mat.alphaMode = opacity != 1 ? BLEND : OPAQUE;
+                gl_mat.alphaCutoff = null;
+            } else {
+                pbr.baseColorFactor = [(float)config.Color[0], (float)config.Color[1], (float)config.Color[2], (float)config.Alpha];
+                pbr.metallicFactor = (float)config.Metallic;
+                pbr.roughnessFactor = (float)config.Roughness;
+                gl_mat.pbrMetallicRoughness = pbr;
+
+                gl_mat.alphaMode = AlmostEqual(config.Alpha, 1) ? OPAQUE : BLEND;
+                gl_mat.alphaCutoff = null;
+            }
         }
     }
 
