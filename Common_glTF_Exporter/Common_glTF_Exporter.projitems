@@ -69,6 +69,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Utils\MaterialUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\GeometryUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\GLTFBinaryDataUtils.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)utils\Parameters.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\SettingsConfig.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\Theme.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\RecordCompat.cs" />

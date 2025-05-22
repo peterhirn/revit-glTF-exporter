@@ -16,13 +16,15 @@ namespace Common_glTF_Exporter.EportUtils
             GLTFNode newNode = new GLTFNode();
             newNode.name = Util.ElementDescription(currentElement);
 
-            if (preferences.properties)
+            //if (preferences.properties)
+            if (preferences.properties && currentElement is FamilyInstance && currentElement.Category.BuiltInCategory == BuiltInCategory.OST_SpecialityEquipment && ((FamilyInstance)currentElement).SuperComponent is null)
             {
                 // get the extras for this element
                 GLTFExtras extras = new GLTFExtras
                 {
                     uniqueId = currentElement.UniqueId,
-                    parameters = Util.GetElementParameters(currentElement, true)
+                    //parameters = Util.GetElementParameters(currentElement, true)
+                    parameters = Parameters.ObjectParametersDict((FamilyInstance)currentElement)
                 };
 
                 if (currentElement.Category != null)
