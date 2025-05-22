@@ -63,6 +63,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Transform\ModelRotation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Transform\ModelScale.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\Analytics.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)utils\Conversion.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\DirectoryUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\Hyperlink.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\MaterialUtils.cs" />
@@ -71,6 +72,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Utils\SettingsConfig.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\Theme.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\RecordCompat.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)utils\Units.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Version\DownloadFile.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Version\InternetConnection.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Version\LatestVersion.cs" />
