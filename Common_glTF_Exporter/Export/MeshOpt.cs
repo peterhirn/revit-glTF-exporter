@@ -54,6 +54,9 @@ namespace Common_glTF_Exporter.Export
             var posFloat = settings.GetType().GetProperty("pos_float", BindingFlags.Public | BindingFlags.Instance);
             posFloat.SetValue(settings, true, null);
 
+            //var meshInstancing = settings.GetType().GetProperty("mesh_instancing", BindingFlags.Public | BindingFlags.Instance);
+            //meshInstancing.SetValue(settings, true, null);
+
             MethodInfo gltfpack = mixedModeAssembly.GetType("Gltf.GltfPack").GetMethod("gltfpack");
             object[] parameters = new object[4];
             parameters[0] = fileToCompress;
