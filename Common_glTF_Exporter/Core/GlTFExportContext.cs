@@ -232,26 +232,15 @@ namespace Revit_glTF_Exporter
 
             newNode.name = Util.ElementDescription(element);
 
-            if (preferences.properties)
+            if (preferences.properties && element is FamilyInstance && element.Category.BuiltInCategory == BuiltInCategory.OST_SpecialityEquipment && ((FamilyInstance)element).SuperComponent is null)
             {
-                // get the extras for this element
                 GLTFExtras extras = new GLTFExtras();
-                extras.uniqueId = element.UniqueId;
-                extras.parameters = Util.GetElementParameters(element, true);
-                if (element.Category != null)
-                {
-                    extras.elementCategory = element.Category.Name;
-                }  
-                #if REVIT2024
                 extras.elementId = element.Id.Value;
-                #else
-                extras.elementId = element.Id.IntegerValue;
-                #endif
+                //extras.parameters = Util.GetElementParameters(element, true);
+                extras.parameters = Parameters.ObjectParametersDict((FamilyInstance)element);
 
                 newNode.extras = extras;
             }
-            
-
 
             nodes.AddOrUpdateCurrent(element.UniqueId, newNode);
 

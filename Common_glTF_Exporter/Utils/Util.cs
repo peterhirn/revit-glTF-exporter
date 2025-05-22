@@ -245,7 +245,7 @@ namespace Revit_glTF_Exporter
         /// <returns>Element parameters dictionary.</returns>
         public static Dictionary<string, string> GetElementParameters(Element element, bool includeType)
         {
-            IEnumerable<Parameter> parameters = element.GetOrderedParameters();
+            IEnumerable<Autodesk.Revit.DB.Parameter> parameters = element.GetOrderedParameters();
 
             var parametersDictionary = new Dictionary<string, string>(parameters.Count());
             var keys = new HashSet<string>();
@@ -255,7 +255,7 @@ namespace Revit_glTF_Exporter
             string key;
             string val;
 
-            foreach (Parameter parameter in parameters)
+            foreach (Autodesk.Revit.DB.Parameter parameter in parameters)
             {
                 key = parameter.Definition.Name;
 
@@ -282,7 +282,7 @@ namespace Revit_glTF_Exporter
 
                     parameters = elementType.GetOrderedParameters();
 
-                    foreach (Parameter parameter in parameters)
+                    foreach (Autodesk.Revit.DB.Parameter parameter in parameters)
                     {
                         sb.Clear();
                         sb.Append(TypeStr).Append(parameter.Definition.Name);
@@ -303,7 +303,7 @@ namespace Revit_glTF_Exporter
             return parametersDictionary;
         }
 
-        private static string GetParameterValue(Parameter parameter)
+        private static string GetParameterValue(Autodesk.Revit.DB.Parameter parameter)
         {
             if (parameter.StorageType == StorageType.String)
             {
