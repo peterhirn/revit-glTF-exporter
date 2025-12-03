@@ -31,12 +31,15 @@ namespace Common_glTF_Exporter.Export
                 files.Add(fileToCompress);
             }
 
-            #if REVIT2025 || REVIT2026
+#if REVIT2025 || REVIT2026
+
+            //throw new InvalidOperationException("FU");
 
             var loadContext = new NonCollectibleAssemblyLoadContext();
 
             string programDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            string meshOptPath = Path.Combine(programDataPath, "Autodesk", "ApplicationPlugins", "leia.bundle", "Contents", "2025", "MeshOpt.dll");
+            //string meshOptPath = Path.Combine(programDataPath, "Autodesk", "ApplicationPlugins", "leia.bundle", "Contents", "2025", "MeshOpt.dll");
+            string meshOptPath = Path.Combine(@"C:\Users\user\Documents\Projects\revit-gltf-exporter\Revit_glTF_Exporter_2026\bin\Release\net8.0-windows", "MeshOpt.dll");
             Assembly mixedModeAssembly = loadContext.LoadFromAssemblyPath(meshOptPath);
             MethodInfo defaultSettings = mixedModeAssembly.GetType("Gltf.GltfSettings").GetMethod("defaults");
 
@@ -74,7 +77,7 @@ namespace Common_glTF_Exporter.Export
                 fileToCompressTemp, "report.txt", settings);
 
 #endif
-
+            /*
             if (File.Exists(fileToCompressTemp))
             {
                 files.ForEach(x => File.Delete(x));
@@ -84,6 +87,7 @@ namespace Common_glTF_Exporter.Export
             {
                 Console.WriteLine("The Compression didn't work");
             }
+            */
             
 
             if (preferences.format == FormatEnum.gltf)
