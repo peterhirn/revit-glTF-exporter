@@ -1,5 +1,7 @@
-using System.Globalization;
 using Autodesk.Revit.DB;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Xml.Linq;
 
 namespace Revit_glTF_Exporter;
 
@@ -15,9 +17,6 @@ internal enum ParameterType
 
 static class Parameters
 {
-    static Autodesk.Revit.DB.Parameter? IfcGuid(FamilyInstance instance) =>
-        instance.get_Parameter(BuiltInParameter.IFC_GUID);
-
     static string ParameterValue(Autodesk.Revit.DB.Parameter parameter)
     {
         switch (parameter.StorageType)
@@ -69,11 +68,30 @@ static class Parameters
         return CreateParameter(parameter, type, exportName, fallback);
     }
 
-    static Parameter? IfcGuidParameter(FamilyInstance instance, string exportName)
+    static Guid? DeviceId(FamilyInstance instance)
     {
-        var parameter = IfcGuid(instance);
+        using var parameter = instance.get_Parameter(BuiltInParameter.IFC_GUID);
+        var ifcGuid = parameter?.AsValueString();
+        if (ifcGuid is null) return null;
+
+        try
+        {
+            return IfcGuid.FromIfcGuid(ifcGuid);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to parse IFC-GUID [{instance.Id.Value}]: {ex.Message}");
+        }
+    }
+
+    static Parameter? DeviceIdParameter(FamilyInstance instance)
+    {
+        var parameter = DeviceId(instance);
         if (parameter is null) return null;
-        return CreateParameter(parameter, ParameterType.Instance, exportName);
+
+        return new(
+          Name: "DeviceID",
+          Value: parameter.Value.ToString());
     }
 
     static IEnumerable<Parameter> ObjectParameters(FamilyInstance instance)
@@ -83,8 +101,6 @@ static class Parameters
 
         Parameter? InstanceParameter(string name, string exportName, string fallback = "") =>
             GetParameter(instance, ParameterType.Instance, name, exportName, fallback);
-
-        var ifcGuid = IfcGuidParameter(instance, "IfcGUID");
 
         return new[]{
             SymbolParameter("01 Manufacturer", "Manufacturer"),
@@ -113,16 +129,15 @@ static class Parameters
             InstanceParameter("02 Serial Number", "SerialNumber"),
             InstanceParameter("03 RUDI", "RUDI"),
 
-            // 05 Specific Device Identifier = eg. TT#5
-            InstanceParameter("05 Specific Device Identifier", "DeviceID", ifcGuid?.Value ?? ""),
-            ifcGuid,
+            DeviceIdParameter(instance),
 
             InstanceParameter("06 Specific System Identifier", "SystemID"),
 
             InstanceParameter("08 LIS IP", "LISIP"),
             InstanceParameter("09 LIS Port", "LISPort"),
-            InstanceParameter("01 Bottom Belt Height", "BottomBeltHeight"),
+            InstanceParameter("10 nLO ID", "nLOID"),
 
+            InstanceParameter("01 Bottom Belt Height", "BottomBeltHeight"),
             InstanceParameter("01 Top Belt Height", "TopBeltHeight"),
             InstanceParameter("01 Belt Height", "TopBeltHeight"),
 

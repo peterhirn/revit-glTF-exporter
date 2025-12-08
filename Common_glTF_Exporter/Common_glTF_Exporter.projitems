@@ -66,6 +66,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)utils\Conversion.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\DirectoryUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\Hyperlink.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Utils\IfcGuid.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\MaterialUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\GeometryUtils.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utils\GLTFBinaryDataUtils.cs" />
