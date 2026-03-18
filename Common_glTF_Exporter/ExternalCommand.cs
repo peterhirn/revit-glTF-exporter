@@ -8,6 +8,7 @@
     using Autodesk.Revit.UI;
     using Common_glTF_Exporter.Utils;
     using Common_glTF_Exporter.Core;
+    using System.Text;
 
     [Transaction(TransactionMode.Manual)]
     [Regeneration(RegenerationOption.Manual)]
@@ -110,6 +111,66 @@
                 exporter.Export(view);
 
                 TaskDialog.Show("glTF Export", "Finished");
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Error", ex.ToString());
+                return Result.Failed;
+            }
+        }
+    }
+
+    [Transaction(TransactionMode.Manual)]
+    [Regeneration(RegenerationOption.Manual)]
+    public class ExportFamilies : IExternalCommand
+    {
+        static readonly ElementClassFilter SymbolFilter =
+            new(typeof(FamilyInstance));
+
+        static readonly ElementCategoryFilter SpecialityEquipmentCategoryFilter =
+            new(BuiltInCategory.OST_SpecialityEquipment);
+
+        static LogicalAndFilter SpecialityEquipmentDocumentFilter() =>
+            new(SymbolFilter, SpecialityEquipmentCategoryFilter);
+
+        static IEnumerable<FamilyInstance> SpecialityEquipment(Document document)
+        {
+            using var filter = SpecialityEquipmentDocumentFilter();
+            using var collector = new FilteredElementCollector(document)
+                .WherePasses(filter);
+
+            foreach (var instance in collector.Cast<FamilyInstance>())
+                yield return instance;
+        }
+
+        static IEnumerable<FamilyInstance> ObjectInstances(Document document) =>
+            SpecialityEquipment(document).Where(i => i.SuperComponent is null);
+
+        static IEnumerable<FamilySymbol> ObjectSymbols(Document document) =>
+            ObjectInstances(document).Select(i => i.Symbol).Cast<FamilySymbol>().DistinctBy(s => s.Id);
+
+        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        {
+            try
+            {
+                var uiapp = commandData.Application;
+                var uidoc = uiapp.ActiveUIDocument;
+                var app = uiapp.Application;
+                var doc = uidoc.Document;
+
+                var foo = ObjectSymbols(doc).ToList();
+
+                var sb = new StringBuilder();
+                sb.AppendLine($"Symbols: {foo.Count.ToString()}");
+
+                foreach(var item in foo)
+                {
+                    sb.AppendLine(item.Family.Name);
+                }
+
+                TaskDialog.Show("Families", sb.ToString());
 
                 return Result.Succeeded;
             }
