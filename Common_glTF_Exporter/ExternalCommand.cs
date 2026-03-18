@@ -87,10 +87,12 @@
                 SettingsConfig.SetValue("lights", "false");
                 SettingsConfig.SetValue("grids", "false");
                 SettingsConfig.SetValue("batchId", "false");
-                //SettingsConfig.SetValue("properties", "false");
-                SettingsConfig.SetValue("properties", "true");
-                SettingsConfig.SetValue("relocateTo0", "true");
+                //SettingsConfig.SetValue("properties", "true");
+                SettingsConfig.SetValue("properties", "false");
+                //SettingsConfig.SetValue("relocateTo0", "true");
+                SettingsConfig.SetValue("relocateTo0", "false");
                 SettingsConfig.SetValue("flipAxis", "true");
+                //SettingsConfig.SetValue("flipAxis", "false");
                 SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
                 //SettingsConfig.SetValue("compression", "none");
                 SettingsConfig.SetValue("compression", "Meshopt");

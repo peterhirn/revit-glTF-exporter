@@ -46,16 +46,16 @@ namespace Common_glTF_Exporter.Export
             var settings = defaultSettings.Invoke(null, null);
 
             var keepNodes = settings.GetType().GetProperty("keep_nodes", BindingFlags.Public | BindingFlags.Instance);
-            keepNodes.SetValue(settings, true, null);
+            keepNodes.SetValue(settings, false, null);
 
             var keepExtras = settings.GetType().GetProperty("keep_extras", BindingFlags.Public | BindingFlags.Instance);
-            keepExtras.SetValue(settings, true, null);
+            keepExtras.SetValue(settings, false, null);
 
             var compress = settings.GetType().GetProperty("compress", BindingFlags.Public | BindingFlags.Instance);
             compress.SetValue(settings, true, null);
 
             var posFloat = settings.GetType().GetProperty("pos_float", BindingFlags.Public | BindingFlags.Instance);
-            posFloat.SetValue(settings, true, null);
+            posFloat.SetValue(settings, false, null);
 
             //var meshInstancing = settings.GetType().GetProperty("mesh_instancing", BindingFlags.Public | BindingFlags.Instance);
             //meshInstancing.SetValue(settings, true, null);
