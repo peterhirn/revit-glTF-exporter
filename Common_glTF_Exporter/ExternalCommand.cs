@@ -6,7 +6,9 @@
     using Autodesk.Revit.UI;
     using Common_glTF_Exporter.Core;
     using Common_glTF_Exporter.Utils;
+    using Newtonsoft.Json;
     using System;
+    using System.Collections.Immutable;
     using System.Text;
 
     [Transaction(TransactionMode.Manual)]
@@ -227,6 +229,45 @@
                 }
 
                 TaskDialog.Show("Families", "Done");
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Error", ex.ToString());
+                return Result.Failed;
+            }
+        }
+    }
+
+    [Transaction(TransactionMode.Manual)]
+    [Regeneration(RegenerationOption.Manual)]
+    public class FamilyStencilIds : IExternalCommand
+    {
+        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        {
+            try
+            {
+                var uiapp = commandData.Application;
+                var uidoc = uiapp.ActiveUIDocument;
+                var app = uiapp.Application;
+                var doc = uidoc.Document;
+
+                if (!doc.IsFamilyDocument) throw new InvalidOperationException("Document is not a family");
+                if (doc.FamilyManager is null) throw new InvalidOperationException("FamilyManager is null");
+
+                using var stencilId =
+                    doc.FamilyManager.Parameters.Cast<FamilyParameter>().FirstOrDefault(p => p.Definition.Name == "06 Stencil ID")
+                    ?? throw new InvalidOperationException("Missing StencilId parameter");
+
+                var stencilIds = doc.FamilyManager.Types.Cast<FamilyType>().Select(type => type.AsString(stencilId)).Distinct().ToList();
+
+                var dict = stencilIds.ToImmutableDictionary(s => s, _ => doc.Title);
+
+                var serialized = JsonConvert.SerializeObject(dict,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented });
+
+                TaskDialog.Show("StencilIds", serialized);
 
                 return Result.Succeeded;
             }
