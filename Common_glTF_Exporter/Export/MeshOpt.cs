@@ -77,7 +77,7 @@ namespace Common_glTF_Exporter.Export
                 fileToCompressTemp, "report.txt", settings);
 
 #endif
-            /*
+            
             if (File.Exists(fileToCompressTemp))
             {
                 files.ForEach(x => File.Delete(x));
@@ -87,7 +87,7 @@ namespace Common_glTF_Exporter.Export
             {
                 Console.WriteLine("The Compression didn't work");
             }
-            */
+            
             
 
             if (preferences.format == FormatEnum.gltf)

@@ -76,10 +76,10 @@ namespace Common_glTF_Exporter.Core
             }
         }
 
-        public GLTFExportContext(Document doc, bool isDebug = false)
+        public GLTFExportContext(Document doc, Autodesk.Revit.DB.View? view = null, bool isDebug = false)
         {
             currentDocument = doc;
-            currentView = doc.ActiveView;
+            currentView = view ?? doc.ActiveView;
             this.isDebug = isDebug;
         }
 

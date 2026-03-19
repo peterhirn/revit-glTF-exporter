@@ -6,11 +6,8 @@
     using System.Threading;
     using System.Windows;
     using System.Windows.Controls;
-    using System.Windows.Forms;
     using System.Windows.Input;
-    using Autodesk.Internal.Windows;
     using Autodesk.Revit.DB;
-    using Autodesk.Revit.UI;
     using Common_glTF_Exporter;
     using Common_glTF_Exporter.Core;
     using Common_glTF_Exporter.Utils;

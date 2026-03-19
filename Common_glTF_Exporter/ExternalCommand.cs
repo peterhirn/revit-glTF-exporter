@@ -1,13 +1,12 @@
 ﻿namespace Revit_glTF_Exporter
 {
-    using System;
-    using System.IO;
     using Autodesk.Revit.ApplicationServices;
     using Autodesk.Revit.Attributes;
     using Autodesk.Revit.DB;
     using Autodesk.Revit.UI;
-    using Common_glTF_Exporter.Utils;
     using Common_glTF_Exporter.Core;
+    using Common_glTF_Exporter.Utils;
+    using System;
     using System.Text;
 
     [Transaction(TransactionMode.Manual)]
@@ -103,7 +102,7 @@
                 SettingsConfig.SetValue("release", app.VersionName);
                 SettingsConfig.SetValue("isRFA", "false");
 
-                var ctx = new GLTFExportContext(doc, true);
+                var ctx = new GLTFExportContext(doc, view, true);
                 var exporter = new CustomExporter(doc, ctx)
                 {
                     ShouldStopOnError = false
@@ -160,17 +159,74 @@
                 var app = uiapp.Application;
                 var doc = uidoc.Document;
 
-                var foo = ObjectSymbols(doc).ToList();
+                var symbols = ObjectSymbols(doc).ToList();
 
                 var sb = new StringBuilder();
-                sb.AppendLine($"Symbols: {foo.Count.ToString()}");
+                sb.AppendLine($"Symbols: {symbols.Count.ToString()}");
 
-                foreach(var item in foo)
+                foreach(var item in symbols)
                 {
                     sb.AppendLine(item.Family.Name);
                 }
 
                 TaskDialog.Show("Families", sb.ToString());
+
+                foreach (var symbol in symbols)
+                {
+                    var family = symbol.Family;
+                    var familyDoc = doc.EditFamily(family);
+                    try
+                    {
+                        using var collector = new FilteredElementCollector(familyDoc)
+                            .OfClass(typeof(View3D));
+
+                        using var view = collector.Cast<View3D>().FirstOrDefault() ?? throw new InvalidOperationException("Missing 3d view");
+
+                        var serviceArea = familyDoc.Settings.Categories.get_Item(BuiltInCategory.OST_SpecialityEquipment)?.SubCategories.Cast<Category>().FirstOrDefault(c => c.Name == "Working & Service Area");
+                        if (serviceArea is not null)
+                        {
+                            view.SetCategoryHidden(serviceArea.Id, true);
+                        }
+
+                        SettingsConfig.SetValue("materials", "true");
+                        SettingsConfig.SetValue("format", "glb");
+                        //SettingsConfig.SetValue("format", "gltf");
+                        SettingsConfig.SetValue("normals", "true");
+                        SettingsConfig.SetValue("levels", "false");
+                        SettingsConfig.SetValue("lights", "false");
+                        SettingsConfig.SetValue("grids", "false");
+                        SettingsConfig.SetValue("batchId", "false");
+                        //SettingsConfig.SetValue("properties", "true");
+                        SettingsConfig.SetValue("properties", "false");
+                        //SettingsConfig.SetValue("relocateTo0", "true");
+                        SettingsConfig.SetValue("relocateTo0", "false");
+                        SettingsConfig.SetValue("flipAxis", "true");
+                        //SettingsConfig.SetValue("flipAxis", "false");
+                        SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
+                        //SettingsConfig.SetValue("compression", "none");
+                        SettingsConfig.SetValue("compression", "Meshopt");
+                        SettingsConfig.SetValue("path", Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\" + family.Name);
+                        SettingsConfig.SetValue("fileName", family.Name);
+                        SettingsConfig.SetValue("user", app.Username);
+                        SettingsConfig.SetValue("release", app.VersionName);
+                        SettingsConfig.SetValue("isRFA", "false");
+
+                        var ctx = new GLTFExportContext(familyDoc, view, true);
+                        var exporter = new CustomExporter(familyDoc, ctx)
+                        {
+                            ShouldStopOnError = false
+                        };
+                        exporter.Export(view);
+
+                        //TaskDialog.Show("View", view.Name);
+                    }
+                    finally
+                    {
+                        familyDoc.Close(false);
+                    }
+                }
+
+                TaskDialog.Show("Families", "Done");
 
                 return Result.Succeeded;
             }
