@@ -174,6 +174,10 @@
                 }
 
                 TaskDialog.Show("Families", sb.ToString());
+                var mapping = new Dictionary<string, string>();
+
+                var target = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "ccm");
+                Directory.CreateDirectory(target);
 
                 foreach (var symbol in symbols)
                 {
@@ -181,6 +185,18 @@
                     var familyDoc = doc.EditFamily(family);
                     try
                     {
+                        if (familyDoc.FamilyManager is null) throw new InvalidOperationException("FamilyManager is null");
+
+                        using var stencilIdParameter =
+                            familyDoc.FamilyManager.Parameters.Cast<FamilyParameter>().FirstOrDefault(p => p.Definition.Name == "06 Stencil ID")
+                            ?? throw new InvalidOperationException("Missing StencilId parameter");
+
+                        var stencilIds = familyDoc.FamilyManager.Types.Cast<FamilyType>().Select(type => type.AsString(stencilIdParameter)).Distinct();
+                        foreach (var stencilId in stencilIds)
+                        {
+                            mapping.Add(stencilId, family.Name);
+                        }
+
                         using var collector = new FilteredElementCollector(familyDoc)
                             .OfClass(typeof(View3D));
 
@@ -209,7 +225,7 @@
                         SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
                         //SettingsConfig.SetValue("compression", "none");
                         SettingsConfig.SetValue("compression", "Meshopt");
-                        SettingsConfig.SetValue("path", Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\" + family.Name);
+                        SettingsConfig.SetValue("path", Path.Combine(target, family.Name));
                         SettingsConfig.SetValue("fileName", family.Name);
                         SettingsConfig.SetValue("user", app.Username);
                         SettingsConfig.SetValue("release", app.VersionName);
@@ -221,14 +237,22 @@
                             ShouldStopOnError = false
                         };
                         exporter.Export(view);
-
-                        //TaskDialog.Show("View", view.Name);
+                    }
+                    catch (Exception ex)
+                    {
+                        TaskDialog.Show("Error", family.Name + Environment.NewLine + ex.ToString());
                     }
                     finally
                     {
                         familyDoc.Close(false);
                     }
                 }
+
+                var serialized = JsonConvert.SerializeObject(mapping,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented });
+
+                var mappingFile = Path.Combine(target, "mapping.json");
+                File.WriteAllText(mappingFile, serialized);
 
                 TaskDialog.Show("Families", "Done");
 
