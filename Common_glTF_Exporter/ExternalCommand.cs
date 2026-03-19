@@ -6,9 +6,11 @@
     using Autodesk.Revit.UI;
     using Common_glTF_Exporter.Core;
     using Common_glTF_Exporter.Utils;
+    using Microsoft.Win32;
     using Newtonsoft.Json;
     using System;
     using System.Collections.Immutable;
+    using System.IO;
     using System.Text;
 
     [Transaction(TransactionMode.Manual)]
@@ -268,6 +270,116 @@
                     new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented });
 
                 TaskDialog.Show("StencilIds", serialized);
+
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Error", ex.ToString());
+                return Result.Failed;
+            }
+        }
+    }
+
+    [Transaction(TransactionMode.Manual)]
+    [Regeneration(RegenerationOption.Manual)]
+    public class ExportFamiliesFolder : IExternalCommand
+    {
+        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        {
+            try
+            {
+                var uiapp = commandData.Application;
+                var app = uiapp.Application;
+
+                var dialog = new OpenFolderDialog();
+                var result = dialog.ShowDialog();
+
+                if (result is null || result == false)
+                {
+                    return Result.Cancelled;
+                }
+
+                var files = Directory.GetFiles(dialog.FolderName).Where(f => Path.GetExtension(f).ToLowerInvariant() == ".rfa");
+
+                var target = Path.Combine(dialog.FolderName, "out");
+                Directory.CreateDirectory(target);
+
+                var mapping = new Dictionary<string, string>();
+
+                foreach (var file in files)
+                {
+                    var doc = app.OpenDocumentFile(file);
+                    try
+                    {
+                        if (!doc.IsFamilyDocument) throw new InvalidOperationException("Document is not a family");
+                        if (doc.FamilyManager is null) throw new InvalidOperationException("FamilyManager is null");
+
+                        using var stencilIdParameter =
+                            doc.FamilyManager.Parameters.Cast<FamilyParameter>().FirstOrDefault(p => p.Definition.Name == "06 Stencil ID")
+                            ?? throw new InvalidOperationException("Missing StencilId parameter");
+
+                        var stencilIds = doc.FamilyManager.Types.Cast<FamilyType>().Select(type => type.AsString(stencilIdParameter)).Distinct();
+                        foreach (var stencilId in stencilIds)
+                        {
+                            mapping.Add(stencilId, doc.Title);
+                        }
+
+                        using var collector = new FilteredElementCollector(doc).OfClass(typeof(View3D));
+                        using var view = collector.Cast<View3D>().FirstOrDefault() ?? throw new InvalidOperationException("Missing 3d view");
+
+                        var serviceArea = doc.Settings.Categories.get_Item(BuiltInCategory.OST_SpecialityEquipment)?.SubCategories.Cast<Category>().FirstOrDefault(c => c.Name == "Working & Service Area");
+                        if (serviceArea is not null)
+                        {
+                            using var tx = new Transaction(doc, "hide service area");
+                            tx.Start();
+                            view.SetCategoryHidden(serviceArea.Id, true);
+                            tx.Commit();
+                        }
+
+                        SettingsConfig.SetValue("materials", "true");
+                        SettingsConfig.SetValue("format", "glb");
+                        //SettingsConfig.SetValue("format", "gltf");
+                        SettingsConfig.SetValue("normals", "true");
+                        SettingsConfig.SetValue("levels", "false");
+                        SettingsConfig.SetValue("lights", "false");
+                        SettingsConfig.SetValue("grids", "false");
+                        SettingsConfig.SetValue("batchId", "false");
+                        //SettingsConfig.SetValue("properties", "true");
+                        SettingsConfig.SetValue("properties", "false");
+                        //SettingsConfig.SetValue("relocateTo0", "true");
+                        SettingsConfig.SetValue("relocateTo0", "false");
+                        SettingsConfig.SetValue("flipAxis", "true");
+                        //SettingsConfig.SetValue("flipAxis", "false");
+                        SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
+                        //SettingsConfig.SetValue("compression", "none");
+                        SettingsConfig.SetValue("compression", "Meshopt");
+                        SettingsConfig.SetValue("path", Path.Combine(target, doc.Title));
+                        SettingsConfig.SetValue("fileName", doc.Title);
+                        SettingsConfig.SetValue("user", app.Username);
+                        SettingsConfig.SetValue("release", app.VersionName);
+                        SettingsConfig.SetValue("isRFA", "false");
+
+                        var ctx = new GLTFExportContext(doc, view, true);
+                        var exporter = new CustomExporter(doc, ctx)
+                        {
+                            ShouldStopOnError = false
+                        };
+                        exporter.Export(view);
+                    }
+                    finally
+                    {
+                        doc.Close(false);
+                    }
+                }
+
+                var serialized = JsonConvert.SerializeObject(mapping,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented });
+
+                var mappingFile = Path.Combine(target, "mapping.json");
+                File.WriteAllText(mappingFile, serialized);
+
+                TaskDialog.Show("Export folder", "Done");
 
                 return Result.Succeeded;
             }
