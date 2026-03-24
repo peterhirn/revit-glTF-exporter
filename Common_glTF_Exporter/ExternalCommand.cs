@@ -13,6 +13,42 @@
     using System.IO;
     using System.Text;
 
+    static class Export
+    {
+        public static void View(Document doc, View view, string path)
+        {
+            SettingsConfig.SetValue("materials", "true");
+            SettingsConfig.SetValue("format", "glb");
+            //SettingsConfig.SetValue("format", "gltf");
+            SettingsConfig.SetValue("normals", "true");
+            SettingsConfig.SetValue("levels", "false");
+            SettingsConfig.SetValue("lights", "false");
+            SettingsConfig.SetValue("grids", "false");
+            SettingsConfig.SetValue("batchId", "false");
+            //SettingsConfig.SetValue("properties", "true");
+            SettingsConfig.SetValue("properties", "false");
+            //SettingsConfig.SetValue("relocateTo0", "true");
+            SettingsConfig.SetValue("relocateTo0", "false");
+            SettingsConfig.SetValue("flipAxis", "true");
+            //SettingsConfig.SetValue("flipAxis", "false");
+            SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
+            //SettingsConfig.SetValue("compression", "none");
+            SettingsConfig.SetValue("compression", "Meshopt");
+            SettingsConfig.SetValue("path", path);
+            SettingsConfig.SetValue("fileName", Path.GetFileName(path));
+            SettingsConfig.SetValue("user", "");
+            SettingsConfig.SetValue("release", "");
+            SettingsConfig.SetValue("isRFA", "false");
+
+            var ctx = new GLTFExportContext(doc, view, true);
+            var exporter = new CustomExporter(doc, ctx)
+            {
+                ShouldStopOnError = false
+            };
+            exporter.Export(view);
+        }
+    }
+
     [Transaction(TransactionMode.Manual)]
     [Regeneration(RegenerationOption.Manual)]
     public class ExternalCommand : IExternalCommand
@@ -68,50 +104,12 @@
 
                 if (view.GetType().Name != "View3D")
                 {
-                    TaskDialog.Show("Wrong View", "You must be in a 3D view to export");
+                    TaskDialog.Show("Error", "You must be in a 3D view to export");
                     return Result.Succeeded;
                 }
 
-                /*
-                var programDataLocation = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-                var appSettingsFile = string.Concat(programDataLocation, "\\Autodesk\\ApplicationPlugins\\leia.bundle\\Contents\\2026\\Leia_glTF_Exporter.dll.config");
-
-                if (!File.Exists(appSettingsFile))
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(appSettingsFile));
-                    File.WriteAllText(appSettingsFile, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<configuration />");
-                }
-                */
-
-                SettingsConfig.SetValue("materials", "true");
-                SettingsConfig.SetValue("format", "glb");
-                //SettingsConfig.SetValue("format", "gltf");
-                SettingsConfig.SetValue("normals", "true");
-                SettingsConfig.SetValue("levels", "false");
-                SettingsConfig.SetValue("lights", "false");
-                SettingsConfig.SetValue("grids", "false");
-                SettingsConfig.SetValue("batchId", "false");
-                //SettingsConfig.SetValue("properties", "true");
-                SettingsConfig.SetValue("properties", "false");
-                //SettingsConfig.SetValue("relocateTo0", "true");
-                SettingsConfig.SetValue("relocateTo0", "false");
-                SettingsConfig.SetValue("flipAxis", "true");
-                //SettingsConfig.SetValue("flipAxis", "false");
-                SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
-                //SettingsConfig.SetValue("compression", "none");
-                SettingsConfig.SetValue("compression", "Meshopt");
-                SettingsConfig.SetValue("path", Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "\\out");
-                SettingsConfig.SetValue("fileName", "out");
-                SettingsConfig.SetValue("user", app.Username);
-                SettingsConfig.SetValue("release", app.VersionName);
-                SettingsConfig.SetValue("isRFA", "false");
-
-                var ctx = new GLTFExportContext(doc, view, true);
-                var exporter = new CustomExporter(doc, ctx)
-                {
-                    ShouldStopOnError = false
-                };
-                exporter.Export(view);
+                var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "out");
+                Export.View(doc, view, path);
 
                 TaskDialog.Show("glTF Export", "Finished");
 
@@ -208,35 +206,8 @@
                             view.SetCategoryHidden(serviceArea.Id, true);
                         }
 
-                        SettingsConfig.SetValue("materials", "true");
-                        SettingsConfig.SetValue("format", "glb");
-                        //SettingsConfig.SetValue("format", "gltf");
-                        SettingsConfig.SetValue("normals", "true");
-                        SettingsConfig.SetValue("levels", "false");
-                        SettingsConfig.SetValue("lights", "false");
-                        SettingsConfig.SetValue("grids", "false");
-                        SettingsConfig.SetValue("batchId", "false");
-                        //SettingsConfig.SetValue("properties", "true");
-                        SettingsConfig.SetValue("properties", "false");
-                        //SettingsConfig.SetValue("relocateTo0", "true");
-                        SettingsConfig.SetValue("relocateTo0", "false");
-                        SettingsConfig.SetValue("flipAxis", "true");
-                        //SettingsConfig.SetValue("flipAxis", "false");
-                        SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
-                        //SettingsConfig.SetValue("compression", "none");
-                        SettingsConfig.SetValue("compression", "Meshopt");
-                        SettingsConfig.SetValue("path", Path.Combine(target, family.Name));
-                        SettingsConfig.SetValue("fileName", family.Name);
-                        SettingsConfig.SetValue("user", app.Username);
-                        SettingsConfig.SetValue("release", app.VersionName);
-                        SettingsConfig.SetValue("isRFA", "false");
-
-                        var ctx = new GLTFExportContext(familyDoc, view, true);
-                        var exporter = new CustomExporter(familyDoc, ctx)
-                        {
-                            ShouldStopOnError = false
-                        };
-                        exporter.Export(view);
+                        var path = Path.Combine(target, family.Name);
+                        Export.View(familyDoc, view, path);
                     }
                     catch (Exception ex)
                     {
@@ -355,41 +326,14 @@
                         var serviceArea = doc.Settings.Categories.get_Item(BuiltInCategory.OST_SpecialityEquipment)?.SubCategories.Cast<Category>().FirstOrDefault(c => c.Name == "Working & Service Area");
                         if (serviceArea is not null)
                         {
-                            using var tx = new Transaction(doc, "hide service area");
+                            using var tx = new Transaction(doc, "Hide service area");
                             tx.Start();
                             view.SetCategoryHidden(serviceArea.Id, true);
                             tx.Commit();
                         }
 
-                        SettingsConfig.SetValue("materials", "true");
-                        SettingsConfig.SetValue("format", "glb");
-                        //SettingsConfig.SetValue("format", "gltf");
-                        SettingsConfig.SetValue("normals", "true");
-                        SettingsConfig.SetValue("levels", "false");
-                        SettingsConfig.SetValue("lights", "false");
-                        SettingsConfig.SetValue("grids", "false");
-                        SettingsConfig.SetValue("batchId", "false");
-                        //SettingsConfig.SetValue("properties", "true");
-                        SettingsConfig.SetValue("properties", "false");
-                        //SettingsConfig.SetValue("relocateTo0", "true");
-                        SettingsConfig.SetValue("relocateTo0", "false");
-                        SettingsConfig.SetValue("flipAxis", "true");
-                        //SettingsConfig.SetValue("flipAxis", "false");
-                        SettingsConfig.SetValue("units", "autodesk.unit.unit:meters-1.0.0");
-                        //SettingsConfig.SetValue("compression", "none");
-                        SettingsConfig.SetValue("compression", "Meshopt");
-                        SettingsConfig.SetValue("path", Path.Combine(target, doc.Title));
-                        SettingsConfig.SetValue("fileName", doc.Title);
-                        SettingsConfig.SetValue("user", app.Username);
-                        SettingsConfig.SetValue("release", app.VersionName);
-                        SettingsConfig.SetValue("isRFA", "false");
-
-                        var ctx = new GLTFExportContext(doc, view, true);
-                        var exporter = new CustomExporter(doc, ctx)
-                        {
-                            ShouldStopOnError = false
-                        };
-                        exporter.Export(view);
+                        var path = Path.Combine(target, doc.Title);
+                        Export.View(doc, view, path);
                     }
                     finally
                     {
