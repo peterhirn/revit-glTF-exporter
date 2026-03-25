@@ -3,6 +3,7 @@
     using Autodesk.Revit.ApplicationServices;
     using Autodesk.Revit.Attributes;
     using Autodesk.Revit.DB;
+    using Autodesk.Revit.DB.Events;
     using Autodesk.Revit.UI;
     using Common_glTF_Exporter.Core;
     using Common_glTF_Exporter.Utils;
@@ -17,6 +18,25 @@
 
     static class Export
     {
+        public static void SetCategoryVisibility(Document doc, View view)
+        {
+            var category = doc.Settings.Categories.get_Item(BuiltInCategory.OST_SpecialityEquipment);
+            var subCategories = category?.SubCategories.Cast<Category>();
+
+            var geometry = subCategories?.FirstOrDefault(c => c.Name == "3D Geometry");
+            var serviceArea = subCategories?.FirstOrDefault(c => c.Name == "Working & Service Area");
+            if (geometry is not null || serviceArea is not null)
+            {
+                using var tx = new Transaction(doc, "Set category visibility");
+                tx.Start();
+                // Show "3D Geometry"
+                if (geometry is not null) view.SetCategoryHidden(geometry.Id, false);
+                // Hide "Working & Service Area"
+                if (serviceArea is not null) view.SetCategoryHidden(serviceArea.Id, true);
+                tx.Commit();
+            }
+        }
+
         public static void View(Document doc, View view, string path)
         {
             SettingsConfig.SetValue("materials", "true");
@@ -387,7 +407,42 @@
                 var target = Path.Combine(dialog.FolderName, "out");
                 Directory.CreateDirectory(target);
 
-                using var log = new StreamWriter(Path.Combine(target, "log.txt"));
+                using var logWriter = new StreamWriter(Path.Combine(target, "log.txt"));
+
+                void Log(string message)
+                {
+                    logWriter.WriteLine(message);
+                    logWriter.Flush();
+                }
+
+                void LogInfo(string message) => Log($"[INFO] {message}");
+                void LogWarn(string message) => Log($"[WARN] {message}");
+
+                void OnFailuresProcessing(object? sender, FailuresProcessingEventArgs e)
+                {
+                    var fa = e?.GetFailuresAccessor();
+                    if (fa == null) return;
+
+                    var failures = fa.GetFailureMessages();
+
+                    foreach (var failure in failures)
+                    {
+                        var severity = failure.GetSeverity();
+                        var message = failure.GetDescriptionText();
+
+                        var elementIds =
+                            failure.GetFailingElementIds().Select(e => e.Value).ToList();
+
+                        LogWarn($"{elementIds} {message}");
+                    }
+
+                    fa.DeleteAllWarnings();
+
+                    failures = failures.Where(fail => fail.HasResolutions()).ToList();
+                    fa.ResolveFailures(failures);
+                }
+
+                app.FailuresProcessing += OnFailuresProcessing;
 
                 var versionDirectories =
                     Directory.GetDirectories(dialog.FolderName)
@@ -412,14 +467,23 @@
                         .Where(f => Path.GetExtension(f).ToLowerInvariant() == ".rfa"));
                 }
 
+                // NOTE: Sort list so 2023 families are processed first
+                families.Sort();
+
                 TaskDialog.Show("Kinship Families", $"Exporting {families.Count} families");
+                LogInfo($"Exporting {families.Count} families");
 
+                using var openOptions = new OpenOptions();
 
-                var mapping = new Dictionary<string, string>();
+                var index = 0;
+                var mapping = new SortedDictionary<string, string>();
 
                 foreach (var file in families)
                 {
-                    var doc = app.OpenDocumentFile(file);
+                    LogInfo($"{++index}/{families.Count} {file}");
+
+                    var modelPath = ModelPathUtils.ConvertUserVisiblePathToModelPath(file);
+                    var doc = app.OpenDocumentFile(modelPath, openOptions);
                     try
                     {
                         if (!doc.IsFamilyDocument) throw new InvalidOperationException("Document is not a family");
@@ -430,32 +494,37 @@
                             ?? throw new InvalidOperationException("Missing StencilId parameter");
 
                         var stencilIds = doc.FamilyManager.Types.Cast<FamilyType>().Select(type => type.AsString(stencilIdParameter)).Distinct();
+
+                        var hasNewStencilId = false;
                         foreach (var stencilId in stencilIds)
                         {
                             if (!mapping.TryAdd(stencilId, doc.Title))
                             {
-                                log.WriteLine($"Duplicated stencil id {stencilId} {doc.Title} {mapping[stencilId]}");
+                                LogWarn($"Duplicated stencil id {stencilId} '{doc.Title}' '{mapping[stencilId]}'");
                             }
+                            else
+                            {
+                                hasNewStencilId = true;
+                            }
+                        }
+
+                        if (!hasNewStencilId)
+                        {
+                            LogWarn($"Skipping '{doc.Title}' (no new stencil id)");
+                            continue;
                         }
 
                         using var collector = new FilteredElementCollector(doc).OfClass(typeof(View3D));
                         using var view = collector.Cast<View3D>().FirstOrDefault() ?? throw new InvalidOperationException("Missing 3d view");
 
-                        var serviceArea = doc.Settings.Categories.get_Item(BuiltInCategory.OST_SpecialityEquipment)?.SubCategories.Cast<Category>().FirstOrDefault(c => c.Name == "Working & Service Area");
-                        if (serviceArea is not null)
-                        {
-                            using var tx = new Transaction(doc, "Hide service area");
-                            tx.Start();
-                            view.SetCategoryHidden(serviceArea.Id, true);
-                            tx.Commit();
-                        }
+                        Export.SetCategoryVisibility(doc, view);
 
                         var path = Path.Combine(target, doc.Title);
                         Export.View(doc, view, path);
                     }
                     catch (Exception ex)
                     {
-                        log.WriteLine($"Exception {doc.Title} {ex.Message}");
+                        LogWarn($"Exception {doc.Title} {ex.Message}");
                     }
                     finally
                     {
@@ -467,10 +536,10 @@
                     new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented });
 
                 var mappingFile = Path.Combine(target, "mapping.json");
+                LogInfo($"Write mapping {mappingFile}");
                 File.WriteAllText(mappingFile, serialized);
 
-                TaskDialog.Show("Export folder", "Done");
-
+                LogInfo("Finished");
                 return Result.Succeeded;
             }
             catch (Exception ex)
