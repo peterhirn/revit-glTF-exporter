@@ -3,7 +3,6 @@
     using Autodesk.Revit.ApplicationServices;
     using Autodesk.Revit.Attributes;
     using Autodesk.Revit.DB;
-    using Autodesk.Revit.DB.Events;
     using Autodesk.Revit.UI;
     using Common_glTF_Exporter.Core;
     using Common_glTF_Exporter.Utils;
@@ -18,6 +17,20 @@
 
     static class Export
     {
+        static readonly HashSet<string> Need3DGeometry = [
+            "Generic Analyzer",
+            "CCM Vertical Base Plate (ATU-PVT-GATE-OP4)",
+            "cobas pro i 601 Waste Container",
+            "cobas pulse",
+            "Stago sthemO 301-LAS",
+            "Sysmex XN-9100 - Side panel L",
+            "Sysmex XN-9100 - Side panel R",
+            "Sysmex XR-9000 - XR-10 on CV-50",
+            "Sysmex XR-9000 - XR-20 XR-20 on CV-55",
+            "Sysmex XR-9000 - XR-20 on CV-50",
+            "Powervar - UPS 0.8 kVA"
+        ];
+
         public static void SetCategoryVisibility(Document doc, View view)
         {
             var category = doc.Settings.Categories.get_Item(BuiltInCategory.OST_SpecialityEquipment);
@@ -30,7 +43,10 @@
                 using var tx = new Transaction(doc, "Set category visibility");
                 tx.Start();
                 // Show "3D Geometry"
-                //if (geometry is not null) view.SetCategoryHidden(geometry.Id, false);
+                if (geometry is not null && Need3DGeometry.Contains(doc.Title))
+                {
+                    view.SetCategoryHidden(geometry.Id, false);
+                }
                 // Hide "Working & Service Area"
                 if (serviceArea is not null) view.SetCategoryHidden(serviceArea.Id, true);
                 tx.Commit();
@@ -63,6 +79,9 @@
             SettingsConfig.SetValue("isRFA", "false");
 
             var ctx = new GLTFExportContext(doc, view, true);
+
+            /// NOTE: Disposing this object (ie. `using`) increases the export runtime considerably.
+            /// It's more efficient to run the export and then kill Revit.exe
             var exporter = new CustomExporter(doc, ctx)
             {
                 ShouldStopOnError = false
@@ -459,7 +478,9 @@
                 {
                     foreach (var path in Directory.GetDirectories(versionDirectory))
                     {
-                        familyDirectories.TryAdd(Path.GetFileName(path), path);
+                        var name = Path.GetFileName(path);
+                        if (name == "Flexible Generic Analyzer") continue;
+                        familyDirectories.TryAdd(name, path);
                     }
                 }
 
@@ -525,6 +546,12 @@
 
                         var path = Path.Combine(target, doc.Title);
                         Export.View(doc, view, path);
+
+                        var exportedPath = path + ".glb";
+                        if (!File.Exists(exportedPath))
+                        {
+                            LogWarn($"Export created no file '{doc.Title}' {exportedPath}");
+                        }
                     }
                     catch (Exception ex)
                     {
