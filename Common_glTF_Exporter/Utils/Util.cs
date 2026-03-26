@@ -262,6 +262,7 @@ namespace Revit_glTF_Exporter
             foreach (Autodesk.Revit.DB.Parameter parameter in parameters)
             {
                 key = parameter.Definition.Name;
+                if (key is null) throw new ArgumentNullException("fu");
 
                 if (!keys.Contains(key))
                 {
@@ -291,6 +292,8 @@ namespace Revit_glTF_Exporter
                         sb.Clear();
                         sb.Append(TypeStr).Append(parameter.Definition.Name);
                         key = sb.ToString();
+
+                        if (key is null) throw new ArgumentNullException("key FU");
 
                         if (!parametersDictionary.ContainsKey(key))
                         {

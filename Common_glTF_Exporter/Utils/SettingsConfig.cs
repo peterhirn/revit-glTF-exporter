@@ -32,6 +32,8 @@ namespace Common_glTF_Exporter.Utils
 
         public static string GetValue(string key)
         {
+            if (key is null) throw new ArgumentNullException("key FU");
+
             if (!File.Exists(_configFile))
                 CreateDefaultConfig();
 

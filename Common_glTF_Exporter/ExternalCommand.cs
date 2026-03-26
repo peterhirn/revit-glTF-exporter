@@ -30,7 +30,7 @@
                 using var tx = new Transaction(doc, "Set category visibility");
                 tx.Start();
                 // Show "3D Geometry"
-                if (geometry is not null) view.SetCategoryHidden(geometry.Id, false);
+                //if (geometry is not null) view.SetCategoryHidden(geometry.Id, false);
                 // Hide "Working & Service Area"
                 if (serviceArea is not null) view.SetCategoryHidden(serviceArea.Id, true);
                 tx.Commit();
@@ -129,6 +129,8 @@
                     TaskDialog.Show("Error", "You must be in a 3D view to export");
                     return Result.Succeeded;
                 }
+
+                Export.SetCategoryVisibility(doc, view);
 
                 var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "out");
                 Export.View(doc, view, path);
@@ -418,6 +420,7 @@
                 void LogInfo(string message) => Log($"[INFO] {message}");
                 void LogWarn(string message) => Log($"[WARN] {message}");
 
+                /*
                 void OnFailuresProcessing(object? sender, FailuresProcessingEventArgs e)
                 {
                     var fa = e?.GetFailuresAccessor();
@@ -443,6 +446,7 @@
                 }
 
                 app.FailuresProcessing += OnFailuresProcessing;
+                */
 
                 var versionDirectories =
                     Directory.GetDirectories(dialog.FolderName)

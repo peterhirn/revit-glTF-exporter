@@ -273,13 +273,14 @@ namespace Common_glTF_Exporter.Core
         {
             if (preferences.materials == MaterialsEnum.materials || preferences.materials ==  MaterialsEnum.textures)
             {
-                if (node.MaterialId == ElementId.InvalidElementId)
+                if (node.MaterialId == ElementId.InvalidElementId || currentDocument.GetElement(node.MaterialId) as Autodesk.Revit.DB.Material is null)
                 {
                     currentMaterial = GLTFExportUtils.GetGLTFMaterial(materials, node.Transparency, false);
                 }
                 else 
                 {
                     currentMaterial = RevitMaterials.Export(node, preferences, currentDocument);
+                    if (currentMaterial.UniqueId is null) throw new ArgumentNullException("currentMaterial.UniqueId");
                 }
 
                 materials.AddOrUpdateCurrentMaterial(currentMaterial.UniqueId, currentMaterial, false);
@@ -420,6 +421,7 @@ namespace Common_glTF_Exporter.Core
 
                 currentMaterial = MaterialUtils.GetGltfMeshMaterial(currentDocument, preferences, mesh, materials, true);
 
+                if (currentMaterial.UniqueId is null) throw new ArgumentNullException("currentMaterial.UniqueId");
                 materials.AddOrUpdateCurrentMaterial(currentMaterial.UniqueId, currentMaterial, true);
 
                 GLTFExportUtils.AddOrUpdateCurrentItem(currentElement, currentGeometry, currentVertices, currentMaterial);

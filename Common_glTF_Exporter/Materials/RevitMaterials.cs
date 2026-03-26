@@ -69,6 +69,7 @@ namespace Common_glTF_Exporter.Export
 
                 gl_mat.name = material.Name;
                 gl_mat.UniqueId = material.UniqueId;
+                if (material.UniqueId is null) throw new ArgumentNullException("material.UniqueId");
                 MaterialNameContainer.Add(node.MaterialId, new MaterialCacheDTO(material.Name, material.UniqueId));
             }
             else
@@ -76,6 +77,7 @@ namespace Common_glTF_Exporter.Export
                 var elementData = MaterialNameContainer[node.MaterialId];
                 gl_mat.name = elementData.MaterialName;
                 gl_mat.UniqueId = elementData.UniqueId;
+                if (elementData.UniqueId is null) throw new ArgumentNullException("elementData.UniqueId");
                 material = doc.GetElement(node.MaterialId) as Material;
             }
 
@@ -90,6 +92,8 @@ namespace Common_glTF_Exporter.Export
             }
 
             MaterialProperties.SetMaterialColour(node, opacity, ref pbr, ref gl_mat, config);
+
+            if (gl_mat.UniqueId is null) throw new ArgumentNullException("gl_mat.UniqueId");
 
             return gl_mat;
         }

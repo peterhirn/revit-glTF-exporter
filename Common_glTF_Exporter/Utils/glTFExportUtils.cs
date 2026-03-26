@@ -17,7 +17,6 @@
 
             public static GLTFMaterial GetGLTFMaterial(IndexedDictionary<GLTFMaterial> gltfMaterials, double opacity, bool doubleSided)
             {
-
                 if (gltfMaterials.Dict.ContainsKey(DEF_UNIQUEL_ID))
                 {
                     return gltfMaterials.GetElement(DEF_UNIQUEL_ID);

@@ -17,6 +17,7 @@
         /// <returns>Key position.</returns>
         public int AddVertexAndFlatten(PointIntObject p, List<double> vertexBuffer)
         {
+            if (p is null) throw new ArgumentNullException("p");
             if (this.ContainsKey(p))
             {
                 return this[p];
@@ -35,6 +36,7 @@
 
         public int AddVertex(PointIntObject p)
         {
+            if (p is null) throw new ArgumentNullException("p");
             return this.ContainsKey(p)
               ? this[p]
               : this[p] = this.Count;

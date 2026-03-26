@@ -1,8 +1,8 @@
 ﻿namespace Revit_glTF_Exporter
 {
+    using Common_glTF_Exporter.Core;
     using System;
     using System.Collections.Generic;
-    using Common_glTF_Exporter.Core;
 
     /// <summary>
     /// Container for holding a strict set of items
@@ -69,6 +69,8 @@
         /// <returns>true if item did not already exist.</returns>
         public bool AddOrUpdateCurrent(string uuid, T elem)
         {
+            if (uuid is null) throw new ArgumentNullException("uuid add");
+
             if (!this.dict.ContainsKey(uuid))
             {
                 this.List.Add(elem);
@@ -91,6 +93,7 @@
         /// <returns>true if item did not already exist.</returns>
         public bool AddOrUpdateCurrentMaterial(string uuid, T elem, bool doubleSided)
         {
+            if (uuid is null) throw new ArgumentNullException("uuid add material");
             if (!this.dict.ContainsKey(uuid))
             {
                 this.List.Add(elem);
@@ -117,6 +120,7 @@
         /// <returns>Returns TRUE if the dictionary contains the given element, otherwise, returns FALSE.</returns>
         public bool Contains(string uuid)
         {
+            if (uuid is null) throw new ArgumentNullException("uuid");
             return this.dict.ContainsKey(uuid);
         }
 
