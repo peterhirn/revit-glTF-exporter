@@ -443,8 +443,10 @@
                     logWriter.Flush();
                 }
 
+                void LogDebug(string message) => Log($"[DEBUG] {message}");
                 void LogInfo(string message) => Log($"[INFO] {message}");
                 void LogWarn(string message) => Log($"[WARN] {message}");
+                void LogError(string message) => Log($"[ERROR] {message}");
 
                 /*
                 void OnFailuresProcessing(object? sender, FailuresProcessingEventArgs e)
@@ -509,6 +511,7 @@
 
                 var index = 0;
                 var mapping = new SortedDictionary<string, string>();
+                var typeNames = new HashSet<string>();
 
                 foreach (var file in families)
                 {
@@ -525,44 +528,75 @@
                             doc.FamilyManager.Parameters.Cast<FamilyParameter>().FirstOrDefault(p => p.Definition.Name == "06 Stencil ID")
                             ?? throw new InvalidOperationException("Missing StencilId parameter");
 
-                        var stencilIds = doc.FamilyManager.Types.Cast<FamilyType>().Select(type => type.AsString(stencilIdParameter)).Distinct();
+                        using var collector = new FilteredElementCollector(doc).OfClass(typeof(View3D));
+                        using var view = collector.Cast<View3D>().FirstOrDefault();
 
-                        var hasNewStencilId = false;
-                        foreach (var stencilId in stencilIds)
+                        if (view is null)
                         {
-                            if (!mapping.TryAdd(stencilId, doc.Title))
-                            {
-                                LogWarn($"Duplicated stencil id {stencilId} '{doc.Title}' '{mapping[stencilId]}'");
-                            }
-                            else
-                            {
-                                hasNewStencilId = true;
-                            }
-                        }
-
-                        if (!hasNewStencilId)
-                        {
-                            LogWarn($"Skipping '{doc.Title}' (no new stencil id)");
+                            LogError($"Missing 3d view '{doc.Title}'");
                             continue;
                         }
 
-                        using var collector = new FilteredElementCollector(doc).OfClass(typeof(View3D));
-                        using var view = collector.Cast<View3D>().FirstOrDefault() ?? throw new InvalidOperationException("Missing 3d view");
-
                         Export.SetCategoryVisibility(doc, view);
 
-                        var path = Path.Combine(target, doc.Title);
-                        Export.View(doc, view, path);
+                        // EXTRUSION?
+                        //2023\cobas t 711 coagulation\cobas t 711 coagulation.rfa
 
-                        var exportedPath = path + ".glb";
-                        if (!File.Exists(exportedPath))
+                        var familyTypes = doc.FamilyManager.Types.Cast<FamilyType>().Where(t => !string.IsNullOrWhiteSpace(t.Name)).ToList();
+                        if (familyTypes.Count == 0)
                         {
-                            LogWarn($"Export created no file '{doc.Title}' {exportedPath}");
+                            LogWarn($"Family has no types '{doc.Title}'");
+                            continue;
+                        }
+
+                        foreach (var type in familyTypes)
+                        {
+                            try
+                            {
+                                var stencilId = type.AsString(stencilIdParameter);
+                                if (string.IsNullOrEmpty(stencilId))
+                                {
+                                    LogDebug($"Missting stencil id '{type.Name}' '{doc.Title}'");
+                                    continue;
+                                }
+
+                                if (!mapping.TryAdd(stencilId, type.Name))
+                                {
+                                    LogWarn($"Duplicated stencil id {stencilId} '{type.Name}' '{doc.Title}' '{mapping[stencilId]}'");
+                                    continue;
+                                }
+
+                                if (!typeNames.Add(type.Name))
+                                {
+                                    LogWarn($"Duplicated type name '{type.Name}' '{doc.Title}'");
+                                    continue;
+                                }
+
+                                using var tx = new Transaction(doc, "Set family type");
+                                tx.Start();
+                                doc.FamilyManager.CurrentType = type;
+                                tx.Commit();
+
+                                var path = Path.Combine(target, type.Name);
+                                Export.View(doc, view, path);
+
+                                var exportedPath = path + ".glb";
+                                if (!File.Exists(exportedPath))
+                                {
+                                    LogWarn($"Export created no file '{type.Name}' '{doc.Title}' {exportedPath}");
+                                    mapping.Remove(stencilId);
+                                    typeNames.Remove(type.Name);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                LogError($"Failed to export type '{type.Name}' '{doc.Title}' {ex.Message}");
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        LogWarn($"Exception {doc.Title} {ex.Message}");
+                        LogError($"Failed to export family '{doc.Title}' {ex.Message}");
                     }
                     finally
                     {
