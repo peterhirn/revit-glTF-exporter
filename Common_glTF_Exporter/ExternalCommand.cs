@@ -38,19 +38,26 @@
 
             var geometry = subCategories?.FirstOrDefault(c => c.Name == "3D Geometry");
             var serviceArea = subCategories?.FirstOrDefault(c => c.Name == "Working & Service Area");
+
+            using var tx = new Transaction(doc, "Set visibility");
+            tx.Start();
+
+            // Enable "Preview Visiblity"
+            view.TemporaryViewModes.PreviewFamilyVisibility = PreviewFamilyVisibilityMode.On;
+
             if (geometry is not null || serviceArea is not null)
             {
-                using var tx = new Transaction(doc, "Set category visibility");
-                tx.Start();
-                // Show "3D Geometry"
                 if (geometry is not null && Need3DGeometry.Contains(doc.Title))
                 {
+                    // Show "3D Geometry"
                     view.SetCategoryHidden(geometry.Id, false);
                 }
+
                 // Hide "Working & Service Area"
                 if (serviceArea is not null) view.SetCategoryHidden(serviceArea.Id, true);
-                tx.Commit();
             }
+
+            tx.Commit();
         }
 
         public static void View(Document doc, View view, string path)
