@@ -114,51 +114,99 @@
             var familyTypes = doc.FamilyManager.Types.Cast<FamilyType>().Where(t => !string.IsNullOrWhiteSpace(t.Name)).ToList();
             if (familyTypes.Count == 0)
             {
-                log.Warn($"Family has no types '{doc.Title}'");
-            }
-
-            foreach (var type in familyTypes)
-            {
                 try
                 {
-                    var stencilId = type.AsString(stencilIdParameter);
+                    log.Info($"Family has no types '{doc.Title}'");
+
+                    var stencilId = doc.FamilyManager.Types.Cast<FamilyType>().FirstOrDefault()?.AsString(stencilIdParameter);
                     if (string.IsNullOrEmpty(stencilId))
                     {
-                        log.Debug($"Missting stencil id '{type.Name}' '{doc.Title}'");
-                        continue;
+                        log.Debug($"Missing stencil id '{doc.Title}'");
+                        return;
                     }
 
-                    if (!mapping.TryAdd(stencilId, type.Name))
+                    if (!mapping.TryAdd(stencilId, doc.Title))
                     {
-                        log.Warn($"Duplicated stencil id {stencilId} '{type.Name}' '{doc.Title}' '{mapping[stencilId]}'");
-                        continue;
+                        log.Warn($"Duplicated stencil id {stencilId} '{doc.Title}' '{mapping[stencilId]}'");
+                        return;
                     }
 
-                    if (!typeNames.Add(type.Name))
+                    if (!typeNames.Add(doc.Title))
                     {
-                        log.Warn($"Duplicated type name '{type.Name}' '{doc.Title}'");
-                        continue;
+                        log.Warn($"Duplicated type name '{doc.Title}'");
+                        return;
                     }
 
-                    using var tx = new Transaction(doc, "Set family type");
-                    tx.Start();
-                    doc.FamilyManager.CurrentType = type;
-                    tx.Commit();
-
-                    var path = Path.Combine(target, type.Name);
+                    var path = Path.Combine(target, doc.Title);
                     Export.View(doc, view, path);
 
                     var exportedPath = path + ".glb";
                     if (!File.Exists(exportedPath))
                     {
-                        log.Warn($"Export created no file '{type.Name}' '{doc.Title}' {exportedPath}");
+                        log.Warn($"Export created no file '{doc.Title}' {exportedPath}");
                         mapping.Remove(stencilId);
-                        typeNames.Remove(type.Name);
+                        typeNames.Remove(doc.Title);
                     }
                 }
                 catch (Exception ex)
                 {
-                    log.Error($"Failed to export type '{type.Name}' '{doc.Title}' {ex.Message}");
+                    log.Error($"Failed to export base type '{doc.Title}' {ex.Message}");
+                }
+            }
+            else
+            {
+                var typesFolder = Path.Combine(target, doc.Title);
+                Directory.CreateDirectory(typesFolder);
+
+                foreach (var type in familyTypes)
+                {
+                    try
+                    {
+                        var name = $"{doc.Title}/{type.Name}";
+                        var stencilId = type.AsString(stencilIdParameter);
+                        if (string.IsNullOrEmpty(stencilId))
+                        {
+                            log.Debug($"Missing stencil id '{name}'");
+                            continue;
+                        }
+
+                        if (!mapping.TryAdd(stencilId, name))
+                        {
+                            log.Warn($"Duplicated stencil id {stencilId} '{name}' '{mapping[stencilId]}'");
+                            continue;
+                        }
+
+                        if (!typeNames.Add(name))
+                        {
+                            log.Warn($"Duplicated type name '{name}'");
+                            continue;
+                        }
+
+                        using var tx = new Transaction(doc, "Set family type");
+                        tx.Start();
+                        doc.FamilyManager.CurrentType = type;
+                        tx.Commit();
+
+                        var path = Path.Combine(typesFolder, type.Name);
+                        Export.View(doc, view, path);
+
+                        var exportedPath = path + ".glb";
+                        if (!File.Exists(exportedPath))
+                        {
+                            log.Warn($"Export created no file '{name}' {exportedPath}");
+                            mapping.Remove(stencilId);
+                            typeNames.Remove(type.Name);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Error($"Failed to export type '{type.Name}' '{doc.Title}' {ex.Message}");
+                    }
+
+                    if (Directory.Exists(typesFolder) && !Directory.EnumerateFileSystemEntries(typesFolder).Any())
+                    {
+                        Directory.Delete(typesFolder);
+                    }
                 }
             }
         }
