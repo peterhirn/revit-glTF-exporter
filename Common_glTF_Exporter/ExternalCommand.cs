@@ -3,6 +3,7 @@
     using Autodesk.Revit.ApplicationServices;
     using Autodesk.Revit.Attributes;
     using Autodesk.Revit.DB;
+    using Autodesk.Revit.DB.Events;
     using Autodesk.Revit.UI;
     using Common_glTF_Exporter.Core;
     using Common_glTF_Exporter.Utils;
@@ -94,6 +95,111 @@
                 ShouldStopOnError = false
             };
             exporter.Export(view);
+        }
+
+        public static void Family(Log log, Document doc, string target, SortedDictionary<string, string> mapping, HashSet<string> typeNames)
+        {
+            if (!doc.IsFamilyDocument) throw new InvalidOperationException("Document is not a family");
+            if (doc.FamilyManager is null) throw new InvalidOperationException("FamilyManager is null");
+
+            using var stencilIdParameter =
+                doc.FamilyManager.Parameters.Cast<FamilyParameter>().FirstOrDefault(p => p.Definition.Name == "06 Stencil ID")
+                ?? throw new InvalidOperationException("Missing StencilId parameter");
+
+            using var collector = new FilteredElementCollector(doc).OfClass(typeof(View3D));
+            using var view = collector.Cast<View3D>().FirstOrDefault() ?? throw new InvalidOperationException("Missing 3d view");
+
+            SetCategoryVisibility(doc, view);
+
+            var familyTypes = doc.FamilyManager.Types.Cast<FamilyType>().Where(t => !string.IsNullOrWhiteSpace(t.Name)).ToList();
+            if (familyTypes.Count == 0)
+            {
+                log.Warn($"Family has no types '{doc.Title}'");
+            }
+
+            foreach (var type in familyTypes)
+            {
+                try
+                {
+                    var stencilId = type.AsString(stencilIdParameter);
+                    if (string.IsNullOrEmpty(stencilId))
+                    {
+                        log.Debug($"Missting stencil id '{type.Name}' '{doc.Title}'");
+                        continue;
+                    }
+
+                    if (!mapping.TryAdd(stencilId, type.Name))
+                    {
+                        log.Warn($"Duplicated stencil id {stencilId} '{type.Name}' '{doc.Title}' '{mapping[stencilId]}'");
+                        continue;
+                    }
+
+                    if (!typeNames.Add(type.Name))
+                    {
+                        log.Warn($"Duplicated type name '{type.Name}' '{doc.Title}'");
+                        continue;
+                    }
+
+                    using var tx = new Transaction(doc, "Set family type");
+                    tx.Start();
+                    doc.FamilyManager.CurrentType = type;
+                    tx.Commit();
+
+                    var path = Path.Combine(target, type.Name);
+                    Export.View(doc, view, path);
+
+                    var exportedPath = path + ".glb";
+                    if (!File.Exists(exportedPath))
+                    {
+                        log.Warn($"Export created no file '{type.Name}' '{doc.Title}' {exportedPath}");
+                        mapping.Remove(stencilId);
+                        typeNames.Remove(type.Name);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    log.Error($"Failed to export type '{type.Name}' '{doc.Title}' {ex.Message}");
+                }
+            }
+        }
+
+        public static EventHandler<FailuresProcessingEventArgs> CreateFailureProcessing(Log log)
+        {
+            return (object? sender, FailuresProcessingEventArgs e) =>
+            {
+                var fa = e?.GetFailuresAccessor();
+                if (fa == null) return;
+
+                var failures = fa.GetFailureMessages();
+                var deletedElements = false;
+
+                foreach (var failure in failures)
+                {
+                    var severity = failure.GetSeverity();
+                    var message = failure.GetDescriptionText();
+
+                    var elementIds = failure.GetFailingElementIds().ToList();
+
+                    log.Warn($"{severity}: {message} [{string.Join(", ", elementIds.Select(e => e.Value))}]");
+
+                    if (severity == FailureSeverity.Error)
+                    {
+                        if (fa.IsElementsDeletionPermitted(elementIds))
+                        {
+                            log.Warn($"Deleting failed elements [{string.Join(", ", elementIds.Select(id => id.Value))}]");
+                            fa.DeleteElements(elementIds);
+                            deletedElements = true;
+                        }
+                    }
+                }
+
+                fa.DeleteAllWarnings();
+
+                var resolvable = failures.Where(fail => fail.HasResolutions()).ToList();
+                fa.ResolveFailures(resolvable);
+
+                if (deletedElements) e!.SetProcessingResult(FailureProcessingResult.ProceedWithCommit);
+            };
         }
     }
 
@@ -413,6 +519,36 @@
         }
     }
 
+    public class Log(string path) : IDisposable
+    {
+        private readonly StreamWriter Stream = new(path);
+
+        void Write(string message)
+        {
+            Stream.WriteLine(message);
+            Stream.Flush();
+        }
+
+        public void Debug(string message) => Write($"[DEBUG] {message}");
+        public void Info(string message) => Write($"[INFO] {message}");
+        public void Warn(string message) => Write($"[WARN] {message}");
+        public void Error(string message) => Write($"[ERROR] {message}");
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Stream.Dispose();
+            }
+        }
+    }
+
     [Transaction(TransactionMode.Manual)]
     [Regeneration(RegenerationOption.Manual)]
     public class ExportKinshipFolder : IExternalCommand
@@ -435,21 +571,9 @@
                 var target = Path.Combine(dialog.FolderName, "out");
                 Directory.CreateDirectory(target);
 
-                using var logWriter = new StreamWriter(Path.Combine(target, "log.txt"));
+                using var log = new Log(Path.Combine(target, "log.txt"));
 
-                void Log(string message)
-                {
-                    logWriter.WriteLine(message);
-                    logWriter.Flush();
-                }
-
-                void LogDebug(string message) => Log($"[DEBUG] {message}");
-                void LogInfo(string message) => Log($"[INFO] {message}");
-                void LogWarn(string message) => Log($"[WARN] {message}");
-                void LogError(string message) => Log($"[ERROR] {message}");
-
-                /*
-                void OnFailuresProcessing(object? sender, FailuresProcessingEventArgs e)
+                void OnFailuresProcessing(object? sender, Autodesk.Revit.DB.Events.FailuresProcessingEventArgs e)
                 {
                     var fa = e?.GetFailuresAccessor();
                     if (fa == null) return;
@@ -464,7 +588,7 @@
                         var elementIds =
                             failure.GetFailingElementIds().Select(e => e.Value).ToList();
 
-                        LogWarn($"{elementIds} {message}");
+                        log.Warn($"{elementIds} {message}");
                     }
 
                     fa.DeleteAllWarnings();
@@ -472,9 +596,6 @@
                     failures = failures.Where(fail => fail.HasResolutions()).ToList();
                     fa.ResolveFailures(failures);
                 }
-
-                app.FailuresProcessing += OnFailuresProcessing;
-                */
 
                 var versionDirectories =
                     Directory.GetDirectories(dialog.FolderName)
@@ -505,7 +626,7 @@
                 families.Sort();
 
                 TaskDialog.Show("Kinship Families", $"Exporting {families.Count} families");
-                LogInfo($"Exporting {families.Count} families");
+                log.Info($"Exporting {families.Count} families");
 
                 using var openOptions = new OpenOptions();
 
@@ -513,105 +634,101 @@
                 var mapping = new SortedDictionary<string, string>();
                 var typeNames = new HashSet<string>();
 
-                foreach (var file in families)
+                var failuresProcessing = Export.CreateFailureProcessing(log);
+                app.FailuresProcessing += failuresProcessing;
+
+                try
                 {
-                    LogInfo($"{++index}/{families.Count} {file}");
-
-                    var modelPath = ModelPathUtils.ConvertUserVisiblePathToModelPath(file);
-                    var doc = app.OpenDocumentFile(modelPath, openOptions);
-                    try
+                    foreach (var file in families)
                     {
-                        if (!doc.IsFamilyDocument) throw new InvalidOperationException("Document is not a family");
-                        if (doc.FamilyManager is null) throw new InvalidOperationException("FamilyManager is null");
+                        log.Info($"{++index}/{families.Count} {file}");
 
-                        using var stencilIdParameter =
-                            doc.FamilyManager.Parameters.Cast<FamilyParameter>().FirstOrDefault(p => p.Definition.Name == "06 Stencil ID")
-                            ?? throw new InvalidOperationException("Missing StencilId parameter");
-
-                        using var collector = new FilteredElementCollector(doc).OfClass(typeof(View3D));
-                        using var view = collector.Cast<View3D>().FirstOrDefault();
-
-                        if (view is null)
+                        var modelPath = ModelPathUtils.ConvertUserVisiblePathToModelPath(file);
+                        var doc = app.OpenDocumentFile(modelPath, openOptions);
+                        try
                         {
-                            LogError($"Missing 3d view '{doc.Title}'");
-                            continue;
+                            Export.Family(log, doc, target, mapping, typeNames);
                         }
-
-                        Export.SetCategoryVisibility(doc, view);
-
-                        // EXTRUSION?
-                        //2023\cobas t 711 coagulation\cobas t 711 coagulation.rfa
-
-                        var familyTypes = doc.FamilyManager.Types.Cast<FamilyType>().Where(t => !string.IsNullOrWhiteSpace(t.Name)).ToList();
-                        if (familyTypes.Count == 0)
+                        catch (Exception ex)
                         {
-                            LogWarn($"Family has no types '{doc.Title}'");
-                            continue;
+                            log.Error($"Failed to export family '{doc.Title}' {ex.Message}");
                         }
-
-                        foreach (var type in familyTypes)
+                        finally
                         {
-                            try
-                            {
-                                var stencilId = type.AsString(stencilIdParameter);
-                                if (string.IsNullOrEmpty(stencilId))
-                                {
-                                    LogDebug($"Missting stencil id '{type.Name}' '{doc.Title}'");
-                                    continue;
-                                }
-
-                                if (!mapping.TryAdd(stencilId, type.Name))
-                                {
-                                    LogWarn($"Duplicated stencil id {stencilId} '{type.Name}' '{doc.Title}' '{mapping[stencilId]}'");
-                                    continue;
-                                }
-
-                                if (!typeNames.Add(type.Name))
-                                {
-                                    LogWarn($"Duplicated type name '{type.Name}' '{doc.Title}'");
-                                    continue;
-                                }
-
-                                using var tx = new Transaction(doc, "Set family type");
-                                tx.Start();
-                                doc.FamilyManager.CurrentType = type;
-                                tx.Commit();
-
-                                var path = Path.Combine(target, type.Name);
-                                Export.View(doc, view, path);
-
-                                var exportedPath = path + ".glb";
-                                if (!File.Exists(exportedPath))
-                                {
-                                    LogWarn($"Export created no file '{type.Name}' '{doc.Title}' {exportedPath}");
-                                    mapping.Remove(stencilId);
-                                    typeNames.Remove(type.Name);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                LogError($"Failed to export type '{type.Name}' '{doc.Title}' {ex.Message}");
-                            }
+                            doc.Close(false);
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        LogError($"Failed to export family '{doc.Title}' {ex.Message}");
-                    }
-                    finally
-                    {
-                        doc.Close(false);
-                    }
+                }
+                finally
+                {
+                    app.FailuresProcessing -= failuresProcessing;
                 }
 
                 var serialized = JsonConvert.SerializeObject(mapping,
                     new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented });
 
                 var mappingFile = Path.Combine(target, "mapping.json");
-                LogInfo($"Write mapping {mappingFile}");
+                log.Info($"Write mapping {mappingFile}");
                 File.WriteAllText(mappingFile, serialized);
 
-                LogInfo("Finished");
+                log.Info("Finished");
+                return Result.Succeeded;
+            }
+            catch (Exception ex)
+            {
+                TaskDialog.Show("Error", ex.ToString());
+                return Result.Failed;
+            }
+        }
+    }
+
+    [Transaction(TransactionMode.Manual)]
+    [Regeneration(RegenerationOption.Manual)]
+    public class ExportFamily : IExternalCommand
+    {
+        public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
+        {
+            try
+            {
+                var uiapp = commandData.Application;
+                var app = uiapp.Application;
+                var uidoc = uiapp.ActiveUIDocument;
+                var doc = uidoc.Document;
+
+                var view = doc.ActiveView;
+
+                var target = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "family");
+                Directory.CreateDirectory(target);
+
+                using var log = new Log(Path.Combine(target, "log.txt"));
+
+                var mapping = new SortedDictionary<string, string>();
+                var typeNames = new HashSet<string>();
+
+                var failuresProcessing = Export.CreateFailureProcessing(log);
+                app.FailuresProcessing += failuresProcessing;
+
+                try
+                {
+                    Export.Family(log, doc, target, mapping, typeNames);
+                }
+                catch (Exception ex)
+                {
+                    log.Error($"Failed to export family '{doc.Title}' {ex.Message}");
+                }
+                finally
+                {
+                    app.FailuresProcessing -= failuresProcessing;
+                }
+
+                var serialized = JsonConvert.SerializeObject(mapping,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore, Formatting = Formatting.Indented });
+
+                var mappingFile = Path.Combine(target, "mapping.json");
+                log.Info($"Write mapping {mappingFile}");
+                File.WriteAllText(mappingFile, serialized);
+
+                log.Info("Finished");
                 return Result.Succeeded;
             }
             catch (Exception ex)
