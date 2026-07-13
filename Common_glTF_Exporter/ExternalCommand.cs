@@ -573,30 +573,6 @@
 
                 using var log = new Log(Path.Combine(target, "log.txt"));
 
-                void OnFailuresProcessing(object? sender, Autodesk.Revit.DB.Events.FailuresProcessingEventArgs e)
-                {
-                    var fa = e?.GetFailuresAccessor();
-                    if (fa == null) return;
-
-                    var failures = fa.GetFailureMessages();
-
-                    foreach (var failure in failures)
-                    {
-                        var severity = failure.GetSeverity();
-                        var message = failure.GetDescriptionText();
-
-                        var elementIds =
-                            failure.GetFailingElementIds().Select(e => e.Value).ToList();
-
-                        log.Warn($"{elementIds} {message}");
-                    }
-
-                    fa.DeleteAllWarnings();
-
-                    failures = failures.Where(fail => fail.HasResolutions()).ToList();
-                    fa.ResolveFailures(failures);
-                }
-
                 var versionDirectories =
                     Directory.GetDirectories(dialog.FolderName)
                     .Where(d => Regex.IsMatch(Path.GetFileName(d)!, @"^\d{4}$"))
